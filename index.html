@@ -4,7 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="theme-color" content="#0b0f1a" />
-<title>BookScanBot — Scan &amp; Resell</title>
+<meta name="description" content="Scan a book to see what it's about and its eBay sold resale value." />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="BookScanBot" />
+<title>BookScanBot — Scan, Learn &amp; Resell</title>
 <link rel="preconnect" href="https://unpkg.com" />
 <style>
   :root{
@@ -48,12 +54,16 @@
     border-radius:12px;padding:12px 14px;font-size:15px;outline:none;width:100%}
   input:focus{border-color:var(--brand)}
   .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:2px 0 8px;
-    display:flex;align-items:center;justify-content:space-between}
+    display:flex;align-items:center;justify-content:space-between;gap:10px}
   .book{display:flex;gap:14px;align-items:flex-start}
   .cover{width:84px;height:120px;border-radius:10px;object-fit:cover;background:#0b1322;border:1px solid var(--line);flex:none}
   .book h2{margin:0 0 4px;font-size:16px;line-height:1.3}
   .book .meta{color:var(--muted);font-size:13px;margin:2px 0}
   .isbn{font-variant-numeric:tabular-nums;color:var(--brand);font-size:12.5px}
+  .desc{margin-top:14px;font-size:13.5px;line-height:1.6;color:#d6deee;white-space:pre-wrap}
+  .desc.muted{color:var(--muted);font-style:italic}
+  .desccats{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:11px;background:#0b1322;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:3px 10px}
   .verdict{margin-top:14px;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;font-weight:700}
   .verdict.good{background:rgba(31,209,142,.12);border:1px solid rgba(31,209,142,.4);color:var(--good)}
   .verdict.bad{background:rgba(255,93,108,.10);border:1px solid rgba(255,93,108,.35);color:var(--bad)}
@@ -63,9 +73,8 @@
   .stat{flex:1;background:#0b1322;border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:center}
   .stat .n{font-size:20px;font-weight:800;letter-spacing:.3px}
   .stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
-  .ebaywrap{margin-top:8px}
   .ebayframe{width:100%;height:520px;border:1px solid var(--line);border-radius:14px;background:#fff}
-  .framewrap{position:relative}
+  .framewrap{position:relative;margin-top:8px}
   .frameovl{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:24px;
     background:#0b1322;border-radius:14px;color:var(--muted);font-size:13px;line-height:1.6}
   .frameovl.show{display:grid}
@@ -73,10 +82,13 @@
   .settings{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .settings .field{flex:1;min-width:140px}
   .hidden{display:none!important}
-  .spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;
-    display:inline-block;animation:spin .8s linear infinite;vertical-align:-3px}
-  @keyframes spin{to{transform:rotate(360deg)}}
   a.exlink{color:var(--brand);text-decoration:none;font-weight:600}
+  .altrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .altcard{flex:1;min-width:150px;background:#0b1322;border:1px solid var(--line);border-radius:12px;padding:12px;text-decoration:none;color:var(--txt);display:block}
+  .altcard:hover{filter:brightness(1.15)}
+  .altcard .src{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .altcard .val{font-size:15px;font-weight:700;margin-top:4px}
+  .altcard .val small{font-weight:500;color:var(--muted);font-size:12px}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0e1626;border:1px solid var(--line);
     color:var(--txt);padding:12px 18px;border-radius:12px;box-shadow:var(--shadow);font-size:14px;opacity:0;
     transition:opacity .25s ease,transform .25s ease;pointer-events:none;z-index:50}
@@ -92,6 +104,13 @@
   .hist .hx:hover{color:var(--bad);background:rgba(255,93,108,.1)}
   .linkbtn{background:none;border:none;color:var(--brand);font-size:12px;cursor:pointer;padding:0;flex:none;min-width:0;font-weight:600}
   .empty{color:var(--muted);font-size:13px;text-align:center;padding:18px}
+  .switch{position:relative;display:inline-block;width:42px;height:24px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;cursor:pointer;inset:0;background:#2a3650;border-radius:999px;transition:.2s}
+  .slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked + .slider{background:linear-gradient(135deg,var(--brand),var(--brand2))}
+  .switch input:checked + .slider:before{transform:translateX(18px)}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);text-transform:none;letter-spacing:0}
   footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:24px;line-height:1.6}
 </style>
 </head>
@@ -101,11 +120,10 @@
     <div class="logo">🤖</div>
     <div>
       <h1>BookScanBot</h1>
-      <div class="sub">Scan a book → see eBay sold prices → decide to flip</div>
+      <div class="sub">Scan a book → learn about it → see its resale value</div>
     </div>
   </header>
 
-  <!-- SCANNER -->
   <section class="card">
     <div class="scanbox" id="scanbox">
       <video id="video" playsinline class="hidden"></video>
@@ -122,8 +140,15 @@
     </div>
   </section>
 
-  <!-- SETTINGS -->
   <section class="card">
+    <div class="label"><span>Options</span></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <label class="toggle"><span class="switch"><input type="checkbox" id="tgDesc" checked><span class="slider"></span></span> Show "About this book" overview</label>
+      <label class="toggle"><span class="switch"><input type="checkbox" id="tgResell" checked><span class="slider"></span></span> Show reselling tools (eBay sold, prices, verdict)</label>
+    </div>
+  </section>
+
+  <section class="card" id="settingsCard">
     <div class="label">Your flip rules</div>
     <div class="settings">
       <div class="field">
@@ -135,10 +160,9 @@
         <input id="cost" type="number" value="1" min="0" step="0.5" />
       </div>
     </div>
-    <div class="tip">A book is flagged <b style="color:var(--good)">worth it</b> when typical eBay sold prices clear your minimum and beat your cost + ~15% fees.</div>
+    <div class="tip">A book is flagged <b style="color:var(--good)">worth it</b> when typical sold prices clear your minimum and beat your cost + ~15% fees.</div>
   </section>
 
-  <!-- RESULT -->
   <section class="card hidden" id="result">
     <div class="book">
       <img class="cover" id="cover" alt="cover" />
@@ -149,31 +173,43 @@
         <div class="isbn" id="isbnOut">—</div>
       </div>
     </div>
+  </section>
+
+  <section class="card hidden" id="descCard">
+    <div class="label"><span>About this book</span></div>
+    <div class="desc muted" id="descText">Loading description…</div>
+    <div class="desccats" id="descCats"></div>
+  </section>
+
+  <section class="card hidden" id="resellWrap">
     <div class="avgbar">
       <div class="stat"><div class="n" id="avgN">—</div><div class="k">Avg sold / 30d</div></div>
       <div class="stat"><div class="n" id="cntN">—</div><div class="k">Sales counted</div></div>
       <div class="stat"><div class="n" id="rangeN">—</div><div class="k">Low–High</div></div>
     </div>
-    <div class="verdict warn" id="verdict"><span class="em">⏳</span><span id="verdictText">Loading eBay…</span></div>
+    <div class="verdict warn" id="verdict"><span class="em">⏳</span><span id="verdictText">Loading…</span></div>
   </section>
 
-  <!-- EBAY -->
+  <section class="card hidden" id="altCard">
+    <div class="label"><span>Other price sources</span></div>
+    <div class="altrow" id="altRow"></div>
+    <div class="tip">An alternative to eBay — Google Books shows a listed price when available; the others open used/sold listings on that marketplace.</div>
+  </section>
+
   <section class="card hidden" id="ebaySection">
     <div class="label"><span>eBay — sold &amp; completed listings</span>
       <a class="exlink" id="ebayOpen" target="_blank" rel="noopener">open in new tab ↗</a></div>
-    <div class="ebaywrap framewrap">
+    <div class="framewrap">
       <iframe id="ebayFrame" class="ebayframe" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
       <div class="frameovl" id="frameovl">
         <div>
           eBay blocks showing its sold-listings page inside other sites for security.<br/><br/>
           <a class="btn" id="ebayOpen2" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;padding:10px 18px">↗ View real sold prices on eBay</a>
-          <div style="margin-top:14px;font-size:11.5px">Tip: the live 30-day average above appears automatically once the price proxy is connected (see notes).</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- HISTORY -->
   <section class="card">
     <div class="label"><span>Scan history</span><button class="linkbtn" id="clearHist">Clear all</button></div>
     <ul class="hist" id="histList"></ul>
@@ -181,8 +217,8 @@
   </section>
 
   <footer>
-    BookScanBot · Book data from Open Library · Prices from eBay sold listings.<br/>
-    Scan history is saved privately in your browser. Not affiliated with eBay.
+    BookScanBot · Book data from Open Library &amp; Google Books · Prices from eBay sold listings.<br/>
+    Scan history is saved privately in your browser. Add to Home Screen to use it like an app. Not affiliated with eBay.
   </footer>
 </div>
 
@@ -197,14 +233,10 @@
   var startBtn=$("startBtn"), stopBtn=$("stopBtn"), lookupBtn=$("lookupBtn");
   var manualIsbn=$("manualIsbn"), toast=$("toast");
   var codeReader=null;
+  var lastIsbn=null;
 
-  // ===== OPTIONAL PRICE PROXY HOOK =====
-  // To enable an accurate in-page 30-day average, deploy a small proxy
-  // (Cloudflare Worker or eBay Marketplace Insights API) that accepts ?isbn=
-  // and returns JSON: { avg:Number, count:Number, low:Number, high:Number }.
-  // Then paste its URL below. Leave empty to run in link-only mode.
-  var PRICE_PROXY = ""; // e.g. "https://bookscanbot-proxy.yourname.workers.dev"
-  // =====================================
+  // Optional price proxy (Cloudflare Worker / eBay API). Empty = link-only mode.
+  var PRICE_PROXY = "";
 
   function showToast(msg){
     toast.textContent=msg; toast.classList.add("show");
@@ -214,6 +246,26 @@
   function isValidIsbn(s){ s=cleanIsbn(s); return s.length===10 || s.length===13; }
   function money(n){ return "$"+(Math.round(n*100)/100).toFixed(2); }
 
+  // ===== PREFERENCES =====
+  var PKEY="bookscanbot.prefs.v1";
+  function getPrefs(){ try{ return JSON.parse(localStorage.getItem(PKEY))||{}; }catch(e){ return {}; } }
+  function savePrefs(p){ try{ localStorage.setItem(PKEY, JSON.stringify(p)); }catch(e){} }
+  function applyPrefs(){
+    var p=getPrefs();
+    if(p.desc===false){ $("tgDesc").checked=false; }
+    if(p.resell===false){ $("tgResell").checked=false; }
+    reflectToggles();
+  }
+  function reflectToggles(){
+    var showDesc=$("tgDesc").checked, showResell=$("tgResell").checked;
+    $("descCard").classList.toggle("hidden", !showDesc || !lastIsbn);
+    $("settingsCard").classList.toggle("hidden", !showResell);
+    $("resellWrap").classList.toggle("hidden", !showResell || !lastIsbn);
+    $("altCard").classList.toggle("hidden", !showResell || !lastIsbn);
+    $("ebaySection").classList.toggle("hidden", !showResell || !lastIsbn);
+    savePrefs({desc:showDesc, resell:showResell});
+  }
+
   async function startCamera(){
     if(typeof ZXing==="undefined"){ showToast("Scanner library still loading…"); return; }
     try{
@@ -221,13 +273,7 @@
       ph.classList.add("hidden"); video.classList.remove("hidden"); reticle.classList.remove("hidden");
       startBtn.classList.add("hidden"); stopBtn.classList.remove("hidden");
       await codeReader.decodeFromVideoDevice(null, video, function(res){
-        if(res){
-          var text=res.getText();
-          if(isValidIsbn(text)){
-            navigator.vibrate && navigator.vibrate(60);
-            stopCamera(); handleIsbn(cleanIsbn(text));
-          }
-        }
+        if(res){ var t=res.getText(); if(isValidIsbn(t)){ navigator.vibrate&&navigator.vibrate(60); stopCamera(); handleIsbn(cleanIsbn(t)); } }
       });
     }catch(e){
       ph.classList.remove("hidden"); ph.innerHTML="Couldn't access the camera.<br/><br/>"+(e&&e.message?e.message:"Check camera permissions and that you're on HTTPS.");
@@ -242,39 +288,91 @@
   }
 
   async function lookupBook(isbn){
+    try{ var r=await fetch("https://openlibrary.org/api/books?bibkeys=ISBN:"+isbn+"&format=json&jscmd=data"); var j=await r.json(); return j["ISBN:"+isbn]||null; }
+    catch(e){ return null; }
+  }
+
+  function descFrom(v){ if(!v) return null; if(typeof v==="string") return v; if(v.value) return v.value; return null; }
+
+  // Two-tier description: edition .json then works .json, plus Google Books fallback.
+  async function fetchDescription(isbn){
     try{
-      var r=await fetch("https://openlibrary.org/api/books?bibkeys=ISBN:"+isbn+"&format=json&jscmd=data");
-      var j=await r.json(); return j["ISBN:"+isbn]||null;
+      var r=await fetch("https://openlibrary.org/isbn/"+isbn+".json");
+      if(r.ok){
+        var ed=await r.json();
+        var d=descFrom(ed.description);
+        if(d) return {text:d, src:"Open Library"};
+        if(ed.works && ed.works[0] && ed.works[0].key){
+          var wr=await fetch("https://openlibrary.org"+ed.works[0].key+".json");
+          if(wr.ok){ var w=await wr.json(); var wd=descFrom(w.description); if(wd) return {text:wd, src:"Open Library"}; }
+        }
+      }
+    }catch(e){}
+    // Google Books fallback (also yields categories + price elsewhere)
+    try{
+      var g=await fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:"+isbn);
+      if(g.ok){ var gj=await g.json(); var vi=gj.items&&gj.items[0]&&gj.items[0].volumeInfo; if(vi&&vi.description) return {text:vi.description, src:"Google Books"}; }
+    }catch(e){}
+    return null;
+  }
+
+  async function fetchGoogle(isbn){
+    try{
+      var g=await fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:"+isbn);
+      if(!g.ok) return null; var gj=await g.json();
+      var it=gj.items&&gj.items[0]; if(!it) return null;
+      var price=null;
+      if(it.saleInfo){
+        var sp=it.saleInfo.retailPrice||it.saleInfo.listPrice;
+        if(sp&&sp.amount) price={amount:sp.amount, cur:sp.currencyCode||"USD"};
+      }
+      return { categories:(it.volumeInfo&&it.volumeInfo.categories)||[], price:price, link:it.volumeInfo&&it.volumeInfo.infoLink };
     }catch(e){ return null; }
   }
-  function ebaySoldUrl(isbn){
-    return "https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(isbn)+"&_sacat=267&LH_Sold=1&LH_Complete=1&_sop=13";
-  }
-  function setVerdict(cls, emoji, text){
-    var v=$("verdict"); v.className="verdict "+cls;
-    v.querySelector(".em").textContent=emoji; $("verdictText").textContent=text;
-  }
+
+  function ebaySoldUrl(isbn){ return "https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(isbn)+"&_sacat=267&LH_Sold=1&LH_Complete=1&_sop=13"; }
+  function abeUrl(isbn){ return "https://www.abebooks.com/servlet/SearchResults?isbn="+encodeURIComponent(isbn)+"&sortby=17"; }
+  function amazonUrl(isbn){ return "https://www.amazon.com/s?k="+encodeURIComponent(isbn)+"&i=stripbooks"; }
+  function googleShopUrl(isbn){ return "https://www.google.com/search?tbm=shop&q="+encodeURIComponent(isbn); }
+
+  function setVerdict(cls, emoji, text){ var v=$("verdict"); v.className="verdict "+cls; v.querySelector(".em").textContent=emoji; $("verdictText").textContent=text; }
 
   async function fetchPrices(isbn){
     if(!PRICE_PROXY) return null;
-    try{
-      var r=await fetch(PRICE_PROXY+"?isbn="+encodeURIComponent(isbn));
-      if(!r.ok) return null; return await r.json();
-    }catch(e){ return null; }
+    try{ var r=await fetch(PRICE_PROXY+"?isbn="+encodeURIComponent(isbn)); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
+  }
+
+  function renderAlts(isbn, g){
+    var row=$("altRow"); row.innerHTML="";
+    function card(src, val, href){
+      var a=document.createElement("a"); a.className="altcard"; a.href=href; a.target="_blank"; a.rel="noopener";
+      a.innerHTML="<div class='src'>"+src+"</div><div class='val'>"+val+"</div>";
+      row.appendChild(a);
+    }
+    var gp = (g&&g.price) ? (g.price.cur==="USD"?money(g.price.amount):(g.price.amount+" "+g.price.cur)) : "See listing <small>›</small>";
+    card("Google Books", gp, (g&&g.link)||googleShopUrl(isbn));
+    card("AbeBooks (used)", "See prices <small>›</small>", abeUrl(isbn));
+    card("Amazon (used)", "See prices <small>›</small>", amazonUrl(isbn));
   }
 
   async function handleIsbn(isbn){
     if(!isValidIsbn(isbn)){ showToast("That doesn't look like a valid ISBN."); return; }
-    $("result").classList.remove("hidden"); $("ebaySection").classList.remove("hidden");
+    lastIsbn=isbn;
+    var showResell=$("tgResell").checked, showDesc=$("tgDesc").checked;
+    $("result").classList.remove("hidden");
+    reflectToggles();
+
     $("title").textContent="Looking up…"; $("author").textContent=""; $("pub").textContent="";
     $("isbnOut").textContent="ISBN "+isbn;
     $("cover").src="https://covers.openlibrary.org/b/isbn/"+isbn+"-M.jpg";
+    $("descText").className="desc muted"; $("descText").textContent="Loading description…"; $("descCats").innerHTML="";
     $("avgN").textContent="—"; $("cntN").textContent="—"; $("rangeN").textContent="—";
-    setVerdict("warn","⏳","Loading eBay sold listings…");
 
-    var url=ebaySoldUrl(isbn);
-    $("ebayFrame").src=url; $("ebayOpen").href=url; $("ebayOpen2").href=url;
-    $("frameovl").classList.remove("show");
+    if(showResell){
+      setVerdict("warn","⏳","Loading sold listings…");
+      var url=ebaySoldUrl(isbn);
+      $("ebayFrame").src=url; $("ebayOpen").href=url; $("ebayOpen2").href=url; $("frameovl").classList.remove("show");
+    }
 
     var book=await lookupBook(isbn);
     var title = book && book.title ? book.title : ("ISBN "+isbn);
@@ -283,78 +381,69 @@
       $("title").textContent=title;
       $("author").textContent=(book.authors&&book.authors.length)?("by "+book.authors.map(function(a){return a.name;}).join(", ")):"Author unknown";
       var pb=[]; if(book.publishers&&book.publishers.length)pb.push(book.publishers[0].name); if(book.publish_date)pb.push(book.publish_date);
+      if(book.number_of_pages)pb.push(book.number_of_pages+" pages");
       $("pub").textContent=pb.join(" · ");
       if(book.cover&&book.cover.medium)$("cover").src=book.cover.medium;
     }else{
-      $("title").textContent="Book (details not found)";
-      $("author").textContent="Couldn't fetch the title, but the eBay results below are valid.";
-      $("pub").textContent="";
+      $("title").textContent="Book (details not found)"; $("author").textContent="Couldn't fetch the title."; $("pub").textContent="";
     }
 
-    var minP=parseFloat($("minPrice").value)||0, cost=parseFloat($("cost").value)||0;
-    var breakeven=cost/0.85;
+    // Description (independent of resell toggle)
+    fetchDescription(isbn).then(function(d){
+      if(lastIsbn!==isbn) return;
+      if(d&&d.text){ $("descText").className="desc"; $("descText").textContent=d.text.trim()+"\n\n— "+d.src; }
+      else { $("descText").className="desc muted"; $("descText").textContent="No description available for this book."; }
+    });
 
-    // Try real averaging via proxy
-    var stats=await fetchPrices(isbn);
-    var avgForHistory=null;
-    if(stats && typeof stats.avg==="number"){
-      avgForHistory=stats.avg;
-      $("avgN").textContent=money(stats.avg);
-      $("cntN").textContent=(stats.count!=null?stats.count:"—");
-      $("rangeN").textContent=(stats.low!=null&&stats.high!=null)?(money(stats.low)+"–"+money(stats.high)):"—";
-      if(stats.avg>=Math.max(minP,breakeven)) setVerdict("good","✅","Worth flipping — avg sold "+money(stats.avg)+" clears your "+money(Math.max(minP,breakeven))+" target.");
-      else setVerdict("bad","🚫","Probably skip — avg sold "+money(stats.avg)+" is below your "+money(Math.max(minP,breakeven))+" target.");
-    }else{
-      // Link-only mode: guide the user to read the panel
-      $("avgN").textContent="see ↓"; $("cntN").textContent="—"; $("rangeN").textContent="—";
-      setVerdict("warn","👀","Check the sold prices below. Worth flipping if they're above ~"+money(Math.max(minP,breakeven))+" (your "+money(cost)+" cost + ~15% fees).");
+    // Google data: categories chips + alt prices (only if resell tools shown, but cats also enrich desc card)
+    fetchGoogle(isbn).then(function(g){
+      if(lastIsbn!==isbn) return;
+      if(g&&g.categories&&g.categories.length){
+        var c=$("descCats"); c.innerHTML="";
+        g.categories.slice(0,4).forEach(function(cat){ var s=document.createElement("span"); s.className="chip"; s.textContent=cat; c.appendChild(s); });
+      }
+      renderAlts(isbn, g);
+    });
+
+    if(showResell){
+      var minP=parseFloat($("minPrice").value)||0, cost=parseFloat($("cost").value)||0, breakeven=cost/0.85;
+      var stats=await fetchPrices(isbn); var avgForHistory=null;
+      if(stats && typeof stats.avg==="number"){
+        avgForHistory=stats.avg;
+        $("avgN").textContent=money(stats.avg);
+        $("cntN").textContent=(stats.count!=null?stats.count:"—");
+        $("rangeN").textContent=(stats.low!=null&&stats.high!=null)?(money(stats.low)+"–"+money(stats.high)):"—";
+        if(stats.avg>=Math.max(minP,breakeven)) setVerdict("good","✅","Worth flipping — avg sold "+money(stats.avg)+" clears your "+money(Math.max(minP,breakeven))+" target.");
+        else setVerdict("bad","🚫","Probably skip — avg sold "+money(stats.avg)+" is below your "+money(Math.max(minP,breakeven))+" target.");
+      }else{
+        $("avgN").textContent="see ↓";
+        setVerdict("warn","👀","Check the sold prices below. Worth flipping if above ~"+money(Math.max(minP,breakeven))+" (your "+money(cost)+" cost + ~15% fees).");
+      }
+      setTimeout(function(){ var f=$("ebayFrame"); try{ var d=f.contentDocument; if(d&&d.body&&d.body.children.length===0){ $("frameovl").classList.add("show"); } }catch(e){} }, 3500);
+      setTimeout(function(){ var f=$("ebayFrame"); try{ var d=f.contentDocument; if(d===null) return; }catch(e){ return; } $("frameovl").classList.add("show"); }, 6000);
+      addHistory({isbn:isbn, title:title, cover:cover, avg:avgForHistory, ts:Date.now()});
+    } else {
+      addHistory({isbn:isbn, title:title, cover:cover, avg:null, ts:Date.now()});
     }
-
-    // Detect blocked iframe → show overlay with new-tab button
-    setTimeout(function(){
-      var f=$("ebayFrame");
-      try{ var d=f.contentDocument; if(d && d.body && d.body.children.length===0){ $("frameovl").classList.add("show"); } }
-      catch(e){ /* cross-origin: it loaded fine, no overlay */ }
-    }, 3500);
-    // Some browsers leave a blank frame without throwing; nudge after longer wait
-    setTimeout(function(){
-      var f=$("ebayFrame");
-      try{ var d=f.contentDocument; if(d===null) return; }catch(e){ return; }
-      $("frameovl").classList.add("show");
-    }, 6000);
-
-    addHistory({isbn:isbn, title:title, cover:cover, avg:avgForHistory, ts:Date.now()});
-    $("ebaySection").scrollIntoView({behavior:"smooth",block:"start"});
+    $("result").scrollIntoView({behavior:"smooth",block:"start"});
   }
 
-  // ===== HISTORY (localStorage) =====
+  // ===== HISTORY =====
   var HKEY="bookscanbot.history.v1";
   function getHistory(){ try{ return JSON.parse(localStorage.getItem(HKEY))||[]; }catch(e){ return []; } }
   function saveHistory(a){ try{ localStorage.setItem(HKEY, JSON.stringify(a.slice(0,100))); }catch(e){} }
-  function addHistory(item){
-    var a=getHistory();
-    a=a.filter(function(x){ return x.isbn!==item.isbn; });
-    a.unshift(item); saveHistory(a); renderHistory();
-  }
+  function addHistory(item){ var a=getHistory(); a=a.filter(function(x){return x.isbn!==item.isbn;}); a.unshift(item); saveHistory(a); renderHistory(); }
   function removeHistory(isbn){ saveHistory(getHistory().filter(function(x){return x.isbn!==isbn;})); renderHistory(); }
-  function timeAgo(ts){
-    var s=(Date.now()-ts)/1000;
-    if(s<60)return"just now"; if(s<3600)return Math.floor(s/60)+"m ago";
-    if(s<86400)return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago";
-  }
+  function timeAgo(ts){ var s=(Date.now()-ts)/1000; if(s<60)return"just now"; if(s<3600)return Math.floor(s/60)+"m ago"; if(s<86400)return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago"; }
   function renderHistory(){
-    var a=getHistory(), list=$("histList"), empty=$("histEmpty");
-    list.innerHTML="";
-    if(!a.length){ empty.style.display="block"; return; }
-    empty.style.display="none";
+    var a=getHistory(), list=$("histList"), empty=$("histEmpty"); list.innerHTML="";
+    if(!a.length){ empty.style.display="block"; return; } empty.style.display="none";
     a.forEach(function(it){
       var li=document.createElement("li");
-      var img=document.createElement("img"); img.src=it.cover||"";
-      img.onerror=function(){ this.style.visibility="hidden"; };
+      var img=document.createElement("img"); img.src=it.cover||""; img.onerror=function(){ this.style.visibility="hidden"; };
       var box=document.createElement("div"); box.style.flex="1"; box.style.minWidth="0";
       var t=document.createElement("div"); t.className="ht"; t.textContent=it.title||("ISBN "+it.isbn);
-      var m=document.createElement("div"); m.className="hm";
-      m.textContent="ISBN "+it.isbn+" · "+timeAgo(it.ts)+(it.avg!=null?(" · avg "+money(it.avg)):"");
+      var m=document.createElement("div"); m.className="hm"; m.textContent="ISBN "+it.isbn+" · "+timeAgo(it.ts)+(it.avg!=null?(" · avg "+money(it.avg)):"");
       box.appendChild(t); box.appendChild(m);
       var x=document.createElement("div"); x.className="hx"; x.textContent="×"; x.title="Remove";
       x.addEventListener("click", function(ev){ ev.stopPropagation(); removeHistory(it.isbn); });
@@ -369,10 +458,16 @@
   stopBtn.addEventListener("click", stopCamera);
   lookupBtn.addEventListener("click", function(){ handleIsbn(cleanIsbn(manualIsbn.value)); });
   manualIsbn.addEventListener("keydown", function(e){ if(e.key==="Enter") handleIsbn(cleanIsbn(manualIsbn.value)); });
+  $("tgDesc").addEventListener("change", reflectToggles);
+  $("tgResell").addEventListener("change", reflectToggles);
   $("clearHist").addEventListener("click", function(){ if(confirm("Clear all scan history?")){ saveHistory([]); renderHistory(); } });
   $("cover").addEventListener("error", function(){ this.src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='84' height='120'><rect width='100%' height='100%' fill='%230b1322'/><text x='50%' y='50%' fill='%2393a0bd' font-size='10' text-anchor='middle' dy='.3em'>no cover</text></svg>"; });
 
+  applyPrefs();
   renderHistory();
+
+  // PWA service worker
+  if("serviceWorker" in navigator){ window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); }); }
 })();
 </script>
 </body>
